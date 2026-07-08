@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course View | Short Study</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="course-view.css">
+    <link rel="icon" type="image/png" href="h.png">
+    <script>
+        // Night mode - Load immediately before page renders to prevent flash
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    </script>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo"><span class="logo-icon">&lt;/&gt;</span> Short<span>Study</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="web.html">Courses</a></li>
+                <li><a href="affiliate.html">Affiliate Marketing</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+                <li><a href="other.html">Others</a></li>
+            </ul>
+            <div class="burger">
+                <div class="line1"></div>
+                <div class="line2"></div>
+                <div class="line3"></div>
+            </div>
+        </div>
+    </nav>
+
+    <button class="theme-toggle floating" id="themeToggle" title="Toggle Night Mode">
+        <span class="theme-icon">🌙</span>
+    </button>
+
+    <section class="course-view-section">
+        <div class="course-view-container">
+            <div class="course-header">
+                <button class="btn-back" onclick="history.back()">← Back to Courses</button>
+                <div class="course-title-section">
+                    <div class="course-icon-large" id="courseIconLarge"></div>
+                    <div>
+                        <h1 id="courseTitle">Course Title</h1>
+                        <div class="course-meta-info">
+                            <span class="meta-item" id="courseLevel"></span>
+                            <span class="meta-item" id="courseDuration"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="course-content">
+                <div class="video-section">
+                    <h2>Course Video</h2>
+                    <div class="video-container" id="videoContainer">
+                        <iframe id="videoPlayer" width="100%" height="500" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    </div>
+                </div>
+
+                <div class="course-details">
+                    <div class="details-section">
+                        <h2>Course Description</h2>
+                        <div id="courseDescription" class="description-content"></div>
+                    </div>
+
+                    <div class="details-section">
+                        <h2>Resources & Notes</h2>
+                        <div id="courseNotes" class="notes-content">
+                            <p>No additional resources provided.</p>
+                        </div>
+                    </div>
+                    <div class="details-section">
+                        <h2>Uploaded Notes & PDFs</h2>
+                        <div id="courseUploads" class="notes-content">
+                            <p>No uploaded notes or files yet.</p>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary btn-enroll" onclick="enrollCourse()">Enroll in Course</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="firebase-init.js"></script>
+    <script src="db-config.js"></script>
+    <script src="script.js"></script>
+    <script>
+        // Load course data
+        document.addEventListener('DOMContentLoaded', () => {
+            const courseData = sessionStorage.getItem('currentCourse');
+            
+            if (!courseData) {
+                window.location.href = 'web.html';
+                return;
+            }
+
+            const course = JSON.parse(courseData);
+            loadCourseView(course);
+        });
+
+        function loadCourseView(course) {
+            // Set title
+            document.getElementById('courseTitle').textContent = course.name;
+            
+            // Set icon
+            document.getElementById('courseIconLarge').textContent = course.icon;
+            document.querySelector('title').textContent = course.name + ' | Short Study';
+
+            // Set meta info
+            document.getElementById('courseLevel').textContent = '📚 ' + course.level;
+            document.getElementById('courseDuration').textContent = '⏱️ ' + course.duration;
+
+            // Set YouTube embed: accept full iframe HTML, watch URL, short youtu.be URL, or embed src
+            const videoPlayer = document.getElementById('videoPlayer');
+            const videoContainer = document.getElementById('videoContainer');
+            if (course.youtubeLink && course.youtubeLink.trim().startsWith('<iframe')) {
+                // if full iframe string was saved, render it
+                videoContainer.innerHTML = course.youtubeLink;
+            } else if (course.youtubeLink && isYouTubeUrl(course.youtubeLink)) {
+                const src = makeYouTubeEmbedSrc(course.youtubeLink);
+                if (src) {
+                    videoPlayer.src = src;
+                }
+            } else if (course.youtubeLink && course.youtubeLink.includes('/embed/')) {
+                videoPlayer.src = course.youtubeLink;
+            } else {
+                // fallback: clear src
+                videoPlayer.removeAttribute('src');
+            }
+
+            // Set description with code block support
+            let processedDescription = course.description;
+            if (processedDescription.includes('"')) {
+                processedDescription = processedDescription.replace(/"([^"]*)"/g, '<code class="block-code">$1</code>');
+            }
+            document.getElementById('courseDescription').innerHTML = processedDescription;
+
+            // Set notes/resources
+            if (course.notes) {
+                const notesContent = course.notes.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="resource-link">$1</a>');
+                document.getElementById('courseNotes').innerHTML = notesContent;
+            }
+
+            // Set uploaded course notes and PDF attachments
+            const allNotes = JSON.parse(localStorage.getItem(storageKey('notes'))) || [];
+            const courseUploads = allNotes.filter(item => item.courseId == course.id);
+            const uploadsContainer = document.getElementById('courseUploads');
+
+            if (courseUploads.length === 0) {
+                uploadsContainer.innerHTML = '<p>No uploaded notes or files yet.</p>';
+            } else {
+                uploadsContainer.innerHTML = courseUploads.map(upload => {
+                    const fileLink = upload.fileData ? `<p><a class="resource-link" href="${upload.fileData}" target="_blank" download="${upload.fileName}">Download ${upload.fileName}</a></p>` : '';
+                    const embedText = upload.embeddedText ? `<p>${upload.embeddedText}</p>` : '';
+                    return `<div class="note-card"><strong>${upload.title || 'Course Note'}</strong>${embedText}${fileLink}</div>`;
+                }).join('');
+            }
+        }
+
+        function enrollCourse() {
+            alert('Thank you for your interest! Enrollment system coming soon.');
+        }
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = localStorage.getItem('theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                localStorage.setItem('theme', newTheme);
+                document.documentElement.setAttribute('data-theme', newTheme);
+                updateThemeIcon(newTheme);
+            });
+            updateThemeIcon(localStorage.getItem('theme') || 'light');
+        }
+
+        function updateThemeIcon(theme) {
+            const icon = document.querySelector('.theme-icon');
+            if (icon) {
+                icon.textContent = theme === 'light' ? '🌙' : '☀️';
+            }
+        }
+
+        // Helpers to accept YouTube watch URLs, short links, or iframe strings
+        function isYouTubeUrl(url) {
+            if (!url) return false;
+            return /youtube\.com\/watch\?v=|youtu\.be\//i.test(url);
+        }
+
+        function makeYouTubeEmbedSrc(url) {
+            try {
+                const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+                if (u.hostname.includes('youtu.be')) {
+                    const id = u.pathname.slice(1);
+                    return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+                }
+                if (u.searchParams && u.searchParams.get('v')) {
+                    const id = u.searchParams.get('v');
+                    return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+                }
+            } catch (e) {}
+            return '';
+        }
+    </script>
+</body>
+</html>

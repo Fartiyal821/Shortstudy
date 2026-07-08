@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Affiliate Host | Short Study</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="icon" type="image/png" href="../h.png">
+    <script>
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    </script>
+</head>
+<body>
+    <div id="loginScreen" class="login-container active">
+        <div class="login-box">
+            <h1>Affiliate Host Access</h1>
+            <p>Enter the host password to manage affiliate listings.</p>
+            <input type="password" id="passwordInput" placeholder="Enter password" class="login-input" autofocus>
+            <button id="loginBtn" class="btn-primary login-btn">Login</button>
+            <p id="loginError" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="hostPanel" class="host-panel" style="display: none;">
+        <nav class="navbar">
+            <div class="nav-container">
+                <a href="../index.html" class="logo"><span class="logo-icon">&lt;/&gt;</span> Short<span>Study</span></a>
+                <div class="admin-header">Affiliate Host</div>
+                <button id="logoutBtn" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+
+        <button class="theme-toggle floating" id="themeToggle" title="Toggle Night Mode">
+            <span class="theme-icon">🌙</span>
+        </button>
+
+        <main class="host-content">
+            <h1>Affiliate Product Upload</h1>
+            <p>Upload an affiliate product listing and it will appear on the website.</p>
+
+            <form id="affiliateForm" class="host-form">
+                <div class="form-group">
+                    <label for="productImage">Product Image</label>
+                    <input type="file" id="productImage" accept="image/*">
+                </div>
+
+                <div class="form-group">
+                    <label for="productTitle">Title Name *</label>
+                    <input type="text" id="productTitle" placeholder="Enter product title" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="productLink">Product Link *</label>
+                    <input type="url" id="productLink" placeholder="https://example.com/product" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="productDescription">Description *</label>
+                    <textarea id="productDescription" maxlength="10000" placeholder="Describe the product (up to 10,000 characters)" required></textarea>
+                    <small>Max 10,000 characters.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="productVideo">YouTube URL or iframe (optional)</label>
+                    <input type="text" id="productVideo" placeholder="https://www.youtube.com/watch?v=... or full <iframe> embed code">
+                    <small>Paste a YouTube watch URL or the full iframe embed code to include a product video.</small>
+                </div>
+
+                <button type="submit" class="btn-primary">Submit Affiliate Listing</button>
+                <div id="successMsg" class="success-msg" style="display:none; margin-top: 1rem;"></div>
+            </form>
+
+            <section style="margin-top: 2rem;">
+                <h2>Existing Affiliate Listings</h2>
+                <div id="affiliatePreview" class="cards-grid"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="../firebase-init.js"></script>
+    <script src="../db-config.js"></script>
+    <script src="../script.js"></script>
+    <script>
+        const ADMIN_PASSWORD = '123';
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginError = document.getElementById('loginError');
+        const loginScreen = document.getElementById('loginScreen');
+        const hostPanel = document.getElementById('hostPanel');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loginBtn.addEventListener('click', tryLogin);
+            passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') tryLogin(); });
+            logoutBtn.addEventListener('click', logout);
+            document.getElementById('affiliateForm').addEventListener('submit', handleAffiliateSubmit);
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            themeToggle.querySelector('.theme-icon').textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+            themeToggle.addEventListener('click', toggleTheme);
+            loadAffiliatePreview();
+        });
+
+        function tryLogin() {
+            if (passwordInput.value === ADMIN_PASSWORD) {
+                loginScreen.style.display = 'none';
+                hostPanel.style.display = 'block';
+                passwordInput.value = '';
+                loginError.textContent = '';
+            } else {
+                loginError.textContent = '❌ Incorrect password. Try again.';
+            }
+        }
+
+        function logout() {
+            loginScreen.style.display = 'flex';
+            hostPanel.style.display = 'none';
+        }
+
+        function handleAffiliateSubmit(event) {
+            event.preventDefault();
+            const imageInput = document.getElementById('productImage');
+            const title = document.getElementById('productTitle').value.trim();
+            const link = document.getElementById('productLink').value.trim();
+            const description = document.getElementById('productDescription').value.trim();
+            const videoInput = document.getElementById('productVideo').value.trim();
+
+            if (!title || !link || !description) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+
+            const reader = new FileReader();
+            const file = imageInput.files[0];
+            const saveItem = (imageData) => {
+                const products = JSON.parse(localStorage.getItem(storageKey('affiliate'))) || [];
+                products.unshift({
+                    id: Date.now(),
+                    title,
+                    link,
+                    description,
+                    imageData,
+                    videoEmbed: processEmbedInput(videoInput),
+                    dateAdded: new Date().toLocaleString()
+                });
+                localStorage.setItem(storageKey('affiliate'), JSON.stringify(products));
+                showSuccess('Affiliate product added successfully.');
+                document.getElementById('affiliateForm').reset();
+                loadAffiliatePreview();
+            };
+
+            if (file) {
+                reader.onload = () => saveItem(reader.result);
+                reader.readAsDataURL(file);
+            } else {
+                saveItem('');
+            }
+        }
+
+        function loadAffiliatePreview() {
+            const preview = document.getElementById('affiliatePreview');
+            const products = JSON.parse(localStorage.getItem(storageKey('affiliate'))) || [];
+            if (!products.length) {
+                preview.innerHTML = '<p class="empty-msg">No affiliate listings added yet.</p>';
+                return;
+            }
+            preview.innerHTML = products.map(item => {
+                const imageBlock = item.imageData ? `<img src="${item.imageData}" alt="${item.title}" style="width:100%; border-radius: 14px; margin-bottom: 1rem; height: 180px; object-fit: cover;" />` : '';
+                const videoBlock = item.videoEmbed ? `<div class="affiliate-video" style="margin:12px 0;">${item.videoEmbed}</div>` : (isYouTubeUrl(item.link) ? `<div class="affiliate-video" style="margin:12px 0;"><iframe width="100%" height="240" src="${makeYouTubeEmbedSrc(item.link)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>` : '');
+
+                return `
+                    <div class="affiliate-card">
+                        ${imageBlock}
+                        ${videoBlock}
+                        <strong>${item.title}</strong>
+                        <p>${item.description}</p>
+                        <p><a class="resource-link" href="${item.link}" target="_blank">View product link</a></p>
+                        <p><small>Added on ${item.dateAdded}</small></p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Helper: Accept either a YouTube watch URL, a youtu.be short link, or a full iframe string.
+        function processEmbedInput(input) {
+            if (!input) return '';
+            const trimmed = input.trim();
+            if (trimmed.startsWith('<iframe')) return trimmed;
+            if (isYouTubeUrl(trimmed)) {
+                return `<iframe width="100%" height="240" src="${makeYouTubeEmbedSrc(trimmed)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+            }
+            return ''; // Unsupported formats ignored
+        }
+
+        function isYouTubeUrl(url) {
+            if (!url) return false;
+            return /youtube\.com\/watch\?v=|youtu\.be\//i.test(url);
+        }
+
+        function makeYouTubeEmbedSrc(url) {
+            try {
+                const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+                if (u.hostname.includes('youtu.be')) {
+                    const id = u.pathname.slice(1);
+                    return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+                }
+                if (u.searchParams && u.searchParams.get('v')) {
+                    const id = u.searchParams.get('v');
+                    return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+                }
+            } catch (e) {
+                // fallback
+            }
+            return '';
+        }
+
+        function showSuccess(message) {
+            const successMsg = document.getElementById('successMsg');
+            successMsg.textContent = message;
+            successMsg.style.display = 'block';
+            setTimeout(() => { successMsg.style.display = 'none'; }, 3000);
+        }
+
+        function toggleTheme() {
+            const current = htmlElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            htmlElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            themeToggle.querySelector('.theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+        }
+    </script>
+</body>
+</html>

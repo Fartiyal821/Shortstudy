@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Affiliate Marketing | Short Study</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="h.png">
+    <script>
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo"><span class="logo-icon">&lt;/&gt;</span> Short<span>Study</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="web.html">Courses</a></li>
+                <li><a href="affiliate.html">Affiliate Marketing</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+                <li><a href="other.html">Others</a></li>
+            </ul>
+            <div class="burger">
+                <div class="line1"></div>
+                <div class="line2"></div>
+                <div class="line3"></div>
+            </div>
+        </div>
+    </nav>
+
+    <button class="theme-toggle floating" id="themeToggle" title="Toggle Night Mode">
+        <span class="theme-icon">🌙</span>
+    </button>
+
+    <section class="page-hero">
+        <div class="page-header">
+            <h1>Affiliate Marketing</h1>
+            <p>Explore the latest affiliate products added by hosts. Click any product to open it.</p>
+        </div>
+
+        <div id="affiliateContainer" class="cards-grid"></div>
+    </section>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="firebase-init.js"></script>
+    <script src="db-config.js"></script>
+    <script src="script.js"></script>
+    <script src="affiliate.js"></script>
+    <script>
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        themeToggle.querySelector('.theme-icon').textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+
+        themeToggle.addEventListener('click', () => {
+            const current = htmlElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            htmlElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            themeToggle.querySelector('.theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+        });
+    </script>
+</body>
+</html>

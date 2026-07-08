@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Plans | Short Study</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="h.png">
+    <script>
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo"><span class="logo-icon">&lt;/&gt;</span> Short<span>Study</span></a>
+            <ul class="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="web.html">Courses</a></li>
+                <li><a href="affiliate.html">Affiliate Marketing</a></li>
+                <li><a href="contact.html">Contact Us</a></li>
+                <li><a href="other.html">Others</a></li>
+            </ul>
+            <div class="burger">
+                <div class="line1"></div>
+                <div class="line2"></div>
+                <div class="line3"></div>
+            </div>
+        </div>
+    </nav>
+
+    <button class="theme-toggle floating" id="themeToggle" title="Toggle Night Mode">
+        <span class="theme-icon">🌙</span>
+    </button>
+
+    <section class="other">
+        <div class="other-intro">
+            <h1>Study Plans</h1>
+            <p>Follow course-specific study plans designed to help you stay on track.</p>
+        </div>
+
+        <div id="plansContainer" class="cards-grid"></div>
+    </section>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="firebase-init.js"></script>
+    <script src="db-config.js"></script>
+    <script src="courses-data.js"></script>
+    <script src="script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const plansContainer = document.getElementById('plansContainer');
+            const courses = JSON.parse(localStorage.getItem(storageKey('courses'))) || window.SHORTSTUDY_COURSES || [];
+
+            if (!courses.length) {
+                plansContainer.innerHTML = '<p class="empty-msg">No courses available yet. Add a course first on the host panel.</p>';
+                return;
+            }
+
+            plansContainer.innerHTML = courses.map(course => {
+                return `
+                    <div class="card">
+                        <h2>${course.name}</h2>
+                        <p>${course.description || 'Follow this plan to complete the course in a structured way.'}</p>
+                        <ul>
+                            <li>Week 1: Fundamentals and setup</li>
+                            <li>Week 2: Core concepts and practice</li>
+                            <li>Week 3: Project work and review</li>
+                            <li>Week 4: Assessment and polishing</li>
+                        </ul>
+                        <button class="btn-primary" onclick="openCourse('${course.id}')">Open Course</button>
+                    </div>
+                `;
+            }).join('');
+        });
+
+        function openCourse(courseId) {
+            const courses = JSON.parse(localStorage.getItem(storageKey('courses'))) || window.SHORTSTUDY_COURSES || [];
+            const course = courses.find(c => c.id == courseId);
+            if (course) {
+                sessionStorage.setItem('currentCourse', JSON.stringify(course));
+                window.location.href = 'course-view.html';
+            }
+        }
+
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        themeToggle.querySelector('.theme-icon').textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+
+        themeToggle.addEventListener('click', () => {
+            const current = htmlElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            htmlElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            themeToggle.querySelector('.theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+        });
+    </script>
+</body>
+</html>

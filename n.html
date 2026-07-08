@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes Host | Short Study</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="icon" type="image/png" href="../h.png">
+    <script>
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    </script>
+</head>
+<body>
+    <div id="loginScreen" class="login-container active">
+        <div class="login-box">
+            <h1>Notes Host Access</h1>
+            <p>Enter the host password to upload course notes.</p>
+            <input type="password" id="passwordInput" placeholder="Enter password" class="login-input" autofocus>
+            <button id="loginBtn" class="btn-primary login-btn">Login</button>
+            <p id="loginError" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="hostPanel" class="host-panel" style="display: none;">
+        <nav class="navbar">
+            <div class="nav-container">
+                <a href="../index.html" class="logo"><span class="logo-icon">&lt;/&gt;</span> Short<span>Study</span></a>
+                <div class="admin-header">Notes Host</div>
+                <button id="logoutBtn" class="btn-logout">Logout</button>
+            </div>
+        </nav>
+
+        <button class="theme-toggle floating" id="themeToggle" title="Toggle Night Mode">
+            <span class="theme-icon">🌙</span>
+        </button>
+
+        <main class="host-content">
+            <h1>Upload Course Notes</h1>
+            <p>Select the course, add embedded note content, or upload a PDF directly.</p>
+
+            <form id="notesForm" class="host-form">
+                <div class="form-group">
+                    <label for="courseSelect">Course *</label>
+                    <select id="courseSelect" required>
+                        <option value="">Choose an existing course</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="noteTitle">Note Title</label>
+                    <input type="text" id="noteTitle" placeholder="Enter a note title">
+                </div>
+
+                <div class="form-group">
+                    <label for="embeddedText">Embedded Note / YouTube URL / iframe</label>
+                    <textarea id="embeddedText" placeholder="Add embedded note text, a PDF link, or paste a YouTube URL / iframe to embed video..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="noteFile">Upload Notes PDF</label>
+                    <input type="file" id="noteFile" accept="application/pdf">
+                </div>
+
+                <button type="submit" class="btn-primary">Submit Notes</button>
+                <div id="successMsg" class="success-msg" style="display:none; margin-top: 1rem;"></div>
+            </form>
+
+            <section style="margin-top: 2rem;">
+                <h2>Uploaded Notes Preview</h2>
+                <div id="notesPreview" class="cards-grid"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="../firebase-init.js"></script>
+    <script src="../db-config.js"></script>
+    <script src="../courses-data.js"></script>
+    <script src="../script.js"></script>
+    <script>
+        const ADMIN_PASSWORD = '123';
+        const passwordInput = document.getElementById('passwordInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginError = document.getElementById('loginError');
+        const loginScreen = document.getElementById('loginScreen');
+        const hostPanel = document.getElementById('hostPanel');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const themeToggle = document.getElementById('themeToggle');
+        const htmlElement = document.documentElement;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loginBtn.addEventListener('click', tryLogin);
+            passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') tryLogin(); });
+            logoutBtn.addEventListener('click', logout);
+            document.getElementById('notesForm').addEventListener('submit', handleNotesSubmit);
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            themeToggle.querySelector('.theme-icon').textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+            themeToggle.addEventListener('click', toggleTheme);
+            populateCourses();
+            loadNotesPreview();
+        });
+
+        function tryLogin() {
+            if (passwordInput.value === ADMIN_PASSWORD) {
+                loginScreen.style.display = 'none';
+                hostPanel.style.display = 'block';
+                passwordInput.value = '';
+                loginError.textContent = '';
+            } else {
+                loginError.textContent = '❌ Incorrect password. Try again.';
+            }
+        }
+
+        function logout() {
+            loginScreen.style.display = 'flex';
+            hostPanel.style.display = 'none';
+        }
+
+        function populateCourses() {
+            const courseSelect = document.getElementById('courseSelect');
+            const courses = JSON.parse(localStorage.getItem(storageKey('courses'))) || window.SHORTSTUDY_COURSES || [];
+            courseSelect.innerHTML = '<option value="">Choose an existing course</option>' + courses.map(course => `<option value="${course.id}">${course.name}</option>`).join('');
+        }
+
+        function handleNotesSubmit(event) {
+            event.preventDefault();
+            const courseId = document.getElementById('courseSelect').value;
+            const title = document.getElementById('noteTitle').value.trim();
+            const embeddedText = document.getElementById('embeddedText').value.trim();
+            const noteFile = document.getElementById('noteFile').files[0];
+
+            if (!courseId) {
+                alert('Please choose a course from the existing list.');
+                return;
+            }
+
+            const saveNote = (fileData, fileName) => {
+                const notes = JSON.parse(localStorage.getItem(storageKey('notes'))) || [];
+                const courses = JSON.parse(localStorage.getItem(storageKey('courses'))) || window.SHORTSTUDY_COURSES || [];
+                const course = courses.find(c => c.id == courseId) || {};
+                notes.unshift({
+                    id: Date.now(),
+                    courseId,
+                    title: title || `${course.name} Notes`,
+                    embeddedText: convertEmbeddedText(embeddedText),
+                    fileData,
+                    fileName,
+                    dateAdded: new Date().toLocaleString()
+                });
+                localStorage.setItem(storageKey('notes'), JSON.stringify(notes));
+                showSuccess('Notes uploaded successfully.');
+                document.getElementById('notesForm').reset();
+                loadNotesPreview();
+            };
+
+            if (noteFile) {
+                const reader = new FileReader();
+                reader.onload = () => saveNote(reader.result, noteFile.name);
+                reader.readAsDataURL(noteFile);
+            } else {
+                saveNote('', '');
+            }
+        }
+
+        function loadNotesPreview() {
+            const preview = document.getElementById('notesPreview');
+            const notes = JSON.parse(localStorage.getItem(storageKey('notes'))) || [];
+            const courses = JSON.parse(localStorage.getItem(storageKey('courses'))) || window.SHORTSTUDY_COURSES || [];
+            if (!notes.length) {
+                preview.innerHTML = '<p class="empty-msg">No notes uploaded yet.</p>';
+                return;
+            }
+            preview.innerHTML = notes.map(note => {
+                const course = courses.find(c => c.id == note.courseId) || {};
+                const pdfLink = note.fileData ? `<p><a class="resource-link" href="${note.fileData}" target="_blank" download="${note.fileName}">Download ${note.fileName}</a></p>` : '';
+                return `
+                    <div class="note-card">
+                        <strong>${note.title}</strong>
+                        <p>Course: ${course.name || 'Unknown'}</p>
+                        ${note.embeddedText ? `<p>${note.embeddedText}</p>` : ''}
+                        ${pdfLink}
+                        <p><small>Added on ${note.dateAdded}</small></p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showSuccess(message) {
+            const successMsg = document.getElementById('successMsg');
+            successMsg.textContent = message;
+            successMsg.style.display = 'block';
+            setTimeout(() => { successMsg.style.display = 'none'; }, 3000);
+        }
+
+        function toggleTheme() {
+            const current = htmlElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            htmlElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            themeToggle.querySelector('.theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Convert plain YouTube URLs or short links into iframe embed HTML.
+        function convertEmbeddedText(input) {
+            if (!input) return '';
+            const trimmed = input.trim();
+            if (trimmed.startsWith('<iframe')) return trimmed;
+            // If contains a YouTube URL, replace with iframe
+            const youtubeMatch = trimmed.match(/(https?:\/\/\S*(?:youtube\.com\/watch\?v=|youtu\.be\/)[^\s]+)/i);
+            if (youtubeMatch) {
+                const src = makeYouTubeEmbedSrc(youtubeMatch[1]);
+                if (src) return `<iframe width="100%" height="480" src="${src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+            }
+            return trimmed; // leave other text/links as-is
+        }
+
+        function makeYouTubeEmbedSrc(url) {
+            try {
+                const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+                if (u.hostname.includes('youtu.be')) {
+                    const id = u.pathname.slice(1);
+                    return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+                }
+                if (u.searchParams && u.searchParams.get('v')) {
+                    const id = u.searchParams.get('v');
+                    return `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
+                }
+            } catch (e) {}
+            return '';
+        }
+    </script>
+</body>
+</html>

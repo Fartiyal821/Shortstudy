@@ -1,0 +1,22 @@
+{
+  "version": 3,
+  "routes": [
+    { "src": "^/$", "dest": "/Main/index.html" },
+    { "src": "^/index(?:\.html)?$", "dest": "/Main/index.html" },
+    { "src": "^/web(?:\.html)?$", "dest": "/Main/web.html" },
+    { "src": "^/g(?:\.html)?$", "dest": "/Main/g.html" },
+    { "src": "^/affiliate(?:\.html)?$", "dest": "/Main/affiliate.html" },
+    { "src": "^/contact(?:\.html)?$", "dest": "/Main/contact.html" },
+    { "src": "^/other(?:\.html)?$", "dest": "/Main/other.html" },
+    { "src": "^/notes(?:\.html)?$", "dest": "/Main/notes.html" },
+    { "src": "^/study-plans(?:\.html)?$", "dest": "/Main/study-plans.html" },
+    { "src": "^/course-view(?:\.html)?$", "dest": "/Main/course-view.html" },
+    { "src": "^/admin(?:\.html)?$", "dest": "/Main/admin.html" },
+    { "src": "^/a(?:\.html)?$", "dest": "/Main/a/a.html" },
+    { "src": "^/a\.html$", "dest": "/Main/a/a.html" },
+    { "src": "^/n(?:\.html)?$", "dest": "/Main/n/n.html" },
+    { "src": "^/n\.html$", "dest": "/Main/n/n.html" },
+    { "src": "^/Extra(?:\.html)?$", "dest": "/Main/Extra.html" },
+    { "src": "^/(.*)$", "dest": "/Main/$1" }
+  ]
+}
